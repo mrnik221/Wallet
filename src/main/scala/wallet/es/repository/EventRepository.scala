@@ -4,25 +4,7 @@ import wallet.dm.UserId
 import wallet.es.command._
 import wallet.es.event._
 
-//trait EventRepository {
-//  def add(command: Command): Unit =
-//    command match {
-//      case Add(userId, amount)      => store += (command.userId -> AddEvent(userId, amount))
-//      case Subtract(userId, amount) => store += (command.userId -> SubtractEvent(userId, amount))
-//      case Show(userId)             =>
-//        store += (command.userId -> ShowEvent(userId))
-//        println("Current event store: ")
-//        store.foreach(println)
-//    }
-//
-//  var store: Map[UserId, Event]
-//}
-//
-//object EventRepository {
-//  def apply(): EventRepository = new EventRepository {
-//    override var store: Map[UserId, Event] = Map.empty
-//  }
-//}
+import java.util.concurrent.atomic.AtomicReference
 
 sealed trait Response {
   def state: Option[Int] = None
@@ -36,25 +18,38 @@ case object BalanceResponse extends Response {
   }
 }
 
-class EventRepository {
-  var store: Map[UserId, Seq[Event]] = Map.empty
+class EventRepository(store: AtomicReference[Map[UserId, Seq[Event]]] = new AtomicReference(Map.empty[UserId, Seq[Event]])) {
 
   def add(command: Command): Response =
     command match {
       case Add(userId, amount)      =>
-        store += (command.userId -> (AddEvent(userId, amount) +: store.getOrElse(command.userId, Seq.empty)))
+        store
+          .updateAndGet(eventStore => {
+            eventStore + (command.userId -> (AddEvent(userId, amount) +: eventStore.getOrElse(command.userId, Seq.empty)))
+          })
         Success
       case Subtract(userId, amount) =>
-        store += (command.userId -> (SubtractEvent(userId, amount) +: store.getOrElse(command.userId, Seq.empty)))
+        store
+          .updateAndGet(eventStore => {
+            eventStore + (command.userId -> (SubtractEvent(userId, amount) +: eventStore.getOrElse(command.userId, Seq.empty)))
+          })
         Success
       case Show(userId)             =>
-        store += (command.userId -> (ShowEvent(userId) +: store.getOrElse(command.userId, Seq.empty)))
+        store
+          .updateAndGet(eventStore => {
+            eventStore + (command.userId -> (ShowEvent(userId) +: eventStore.getOrElse(command.userId, Seq.empty)))
+          })
         println("Current event store: ")
-        store.foreach(println)
+        store.get().foreach(println)
         Success
       case CalculateBalance(userId) =>
-        store += (command.userId -> (CalculateBalanceEvent(userId) +: store.getOrElse(command.userId, Seq.empty)))
+        store
+          .updateAndGet(eventStore => {
+            eventStore + (command.userId -> (CalculateBalanceEvent(userId) +: eventStore.getOrElse(command.userId, Seq.empty)))
+          })
+
         val balance = store
+          .get()
           .getOrElse(command.userId, Seq.empty)
           .foldLeft(0)((acc, event) =>
             event match {
