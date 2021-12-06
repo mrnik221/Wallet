@@ -15,7 +15,7 @@ class WalletServiceImpl(repository: StateRepository, journal: Journal[UserId, Ev
       synchronized {
         val currentBalance: Int = repository.getBalance(userId).getOrElse(0)
 
-        if (currentBalance + amount > 0) {
+        if (currentBalance + amount >= 0) {
           journal.append(userId, ChangedEvent(userId, amount)) match {
             case Success =>
               repository.change(userId, amount)

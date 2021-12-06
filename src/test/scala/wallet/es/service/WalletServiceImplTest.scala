@@ -61,7 +61,7 @@ class WalletServiceImplTest extends AnyFlatSpec with Matchers with WalletFixture
     Await.ready(thread2, 5.seconds)
 
     walletService.runCommand(CalculateBalance(userId1))
-    journal.getHistory(userId1) should have length 40
+    journal.getHistory(userId1) should have length 30
   }
 
 }
