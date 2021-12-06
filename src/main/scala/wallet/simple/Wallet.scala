@@ -12,10 +12,10 @@ object Wallet {
     val balance = new AtomicInteger(amount)
     new Wallet {
       override def change(userId: String, amount: Int): Unit =
-        if (balance.get() + amount > 0) {
+        if (balance.get() + amount >= 0) {
           balance.addAndGet(amount)
           ()
-        } else ()
+        } else ()//throw new IllegalThreadStateException("Not enough money")
 
       override def get(userId: String): Int = balance.get()
     }

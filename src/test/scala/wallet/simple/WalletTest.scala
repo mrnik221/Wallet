@@ -31,4 +31,38 @@ class WalletTest extends AnyFlatSpec with Matchers {
     print(s"current balance: ${wallet.get("")}")
     wallet.get("") should be(1000)
   }
+
+  it should "correctly add 1000 and subtract 1000 in concurrent env" in {
+    import scala.concurrent.ExecutionContext.global
+
+    val wallet  = Wallet(0)
+    val thread1 = Future {
+      (1 to 1000).foreach(_ => wallet.change("", 1))
+    }(global)
+    val thread2 = Future {
+      (1 to 1000).foreach(_ => wallet.change("", -1))
+    }(global)
+    Await.ready(thread1, 5.seconds)
+    Await.ready(thread2, 5.seconds)
+
+    print(s"current balance: ${wallet.get("")}")
+    wallet.get("") should be(0)
+  }
+
+  it should "correctly subtract 1000 in concurrent env" in {
+    import scala.concurrent.ExecutionContext.global
+
+    val wallet  = Wallet(500)
+    val thread1 = Future {
+      (1 to 500).foreach(_ => wallet.change("", -500))
+    }(global)
+    val thread2 = Future {
+      (1 to 500).foreach(_ => wallet.change("", -500))
+    }(global)
+    Await.ready(thread1, 5.seconds)
+    Await.ready(thread2, 5.seconds)
+
+    print(s"current balance: ${wallet.get("")}")
+    wallet.get("") should be(0)
+  }
 }
