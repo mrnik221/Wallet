@@ -1,19 +1,11 @@
 package wallet.es.app
 
-import wallet.dm.UserId
-import wallet.es.repository.StateRepositoryImpl
-import wallet.es.service.WalletServiceImpl
+import wallet.es.repository.di.{StateRepositoryComponent, UserEventJournalComponent}
+import wallet.es.service.WalletServiceBuilderComponent
 
-object WalletApp {
+object WalletApp extends WalletServiceBuilderComponent with StateRepositoryComponent with UserEventJournalComponent {
   def main(args: Array[String]): Unit = {
-    lazy val eventRepository = new StateRepositoryImpl()
-//    val walletService        = new WalletServiceImpl(eventRepository)
-
-    val userId = UserId("user-1")
-
-//    walletService.change(userId, 10)
-//    walletService.change(userId, -1)
-//    walletService.show(userId)
-//    println(walletService.get(userId))
+    val wallet1 = createWallet()
+    val wallet2 = createWallet()
   }
 }

@@ -5,6 +5,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import wallet.dm.UserId
 import wallet.es.fixtures.WalletFixtures
+import wallet.es.repository.state.StateRepositoryImpl
 
 import java.util.concurrent.atomic.{AtomicInteger, AtomicReference}
 import scala.concurrent.ExecutionContext.global
@@ -21,6 +22,7 @@ class StateRepositoryImplTest extends AnyFlatSpec with Matchers with Inside with
 
     stateRepository
       .getBalance(userId1)
+      .maybeBalance
       .map(inside(_) { case balance =>
         balance shouldBe 10
       })
@@ -42,6 +44,7 @@ class StateRepositoryImplTest extends AnyFlatSpec with Matchers with Inside with
 
     stateRepository
       .getBalance(userId1)
+      .maybeBalance
       .map(inside(_) { case balance =>
         balance shouldBe -190
       })
@@ -68,8 +71,8 @@ class StateRepositoryImplTest extends AnyFlatSpec with Matchers with Inside with
     Await.ready(thread2, 5.seconds)
 
     for {
-      balance1 <- stateRepository.getBalance(userId1)
-      balance2 <- stateRepository.getBalance(userId2)
+      balance1 <- stateRepository.getBalance(userId1).maybeBalance
+      balance2 <- stateRepository.getBalance(userId2).maybeBalance
     } yield {
       balance1 shouldBe -90
       balance2 shouldBe 0
