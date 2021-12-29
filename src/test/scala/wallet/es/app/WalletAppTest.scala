@@ -3,8 +3,8 @@ package wallet.es.app
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import wallet.es.event.ChangedEvent
-import wallet.es.fixtures.WalletFixtures
 import wallet.es.repository.di.{StateRepositoryComponent, UserEventJournalComponent}
+import wallet.fixtures.WalletFixtures
 
 import scala.concurrent.{Await, Future}
 import scala.concurrent.ExecutionContext.global

@@ -4,8 +4,8 @@ import org.scalatest.Inside
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import wallet.dm.UserId
-import wallet.es.fixtures.WalletFixtures
 import wallet.es.repository.state.StateRepositoryImpl
+import wallet.fixtures.WalletFixtures
 
 import java.util.concurrent.atomic.{AtomicInteger, AtomicReference}
 import scala.concurrent.ExecutionContext.global

@@ -5,9 +5,9 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.time.SpanSugar.convertIntToGrainOfTime
 import wallet.dm.UserId
 import wallet.es.event.{ChangedEvent, Event}
-import wallet.es.fixtures.WalletFixtures
 import wallet.es.repository.journal.Journal
 import wallet.es.repository.journal.JournalResponse.Success
+import wallet.fixtures.WalletFixtures
 
 import scala.concurrent.ExecutionContext.global
 import scala.concurrent.{Await, Future}

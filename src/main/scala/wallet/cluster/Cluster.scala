@@ -1,43 +1,87 @@
 package wallet.cluster
 
-import wallet.cluster.dm.Node
-import wallet.dm.UserId
-import wallet.es.repository.state.StateRepository.BalanceResponse
-import wallet.es.service.WalletService
-import wallet.es.service.WalletService.{ChangeResponse, ShowResponse}
+import wallet.cluster.dm.ShardId
+import wallet.cluster.node.Node
 
 sealed trait ServiceRequest
 
-trait Cluster[S] {
-  def addNode(node: Node[S]): Unit
+trait Cluster[S, Req, Resp] {
+  def addNode(node: Node[S, Req, Resp]): Unit
 
-  def removeNode(node: Node[S]): Unit
+  def removeNode(node: Node[S, Req, Resp]): Unit
 
-  //Guess here's a good spot to use some abstraction over requests
-  def callChangeOnNode(node: Node[S], userId: UserId, amount: Int): ChangeResponse
-  def callShowOnNode(node: Node[S], userId: UserId): ShowResponse
-  def callCalculateBalanceOnNode(node: Node[S], userId: UserId): BalanceResponse
+  def runRequest(req: Req): Resp
+
+  def getNodeInfo: Map[ShardId, Node[S, Req, Resp]]
 }
 
 object Cluster {
-  private var clusterNodes: List[Node[WalletService]] = List.empty
+  private def createNodes[S, Req, Resp](
+    nrOfNodes: Int,
+    serviceBuilder: () => S,
+    requestHandlerBuilder: S => Req => Resp,
+    res: Set[Node[S, Req, Resp]] = Set.empty[Node[S, Req, Resp]]
+  ): Set[Node[S, Req, Resp]] =
+    if (nrOfNodes == 0) res
+    else {
+      val newNode        = serviceBuilder()
+      val requestHandler = requestHandlerBuilder(newNode)
+      createNodes(
+        nrOfNodes - 1,
+        serviceBuilder,
+        requestHandlerBuilder,
+        res + Node(s"node-$nrOfNodes", newNode, requestHandler)
+      )
+    }
 
-  def apply(nodes: Node[WalletService]*): Cluster[WalletService] = {
-    clusterNodes = clusterNodes.concat(nodes)
+  def apply[K, S, Req, Resp](
+    nrOfNodes: Int,
+    serviceBuilder: () => S,
+    requestHandlerBuilder: S => Req => Resp,
+    shardingSingleton: ShardingSingleton[K, S, Req, Resp]
+  ): Cluster[S, Req, Resp] = {
+    val shardsCount                                            = 1000
+    var clusterNodes: Set[Node[S, Req, Resp]]                  = Set.empty
+    var shardingCoordinator: Option[Sharding[K, S, Req, Resp]] = None
+    var lastNodeUsed: Int                                      = 0
 
-    new Cluster[WalletService] {
-      override def addNode(node: Node[WalletService]): Unit = clusterNodes = clusterNodes :+ node
+    clusterNodes = clusterNodes.concat(createNodes[S, Req, Resp](nrOfNodes, serviceBuilder, requestHandlerBuilder))
 
-      override def removeNode(node: Node[WalletService]): Unit = clusterNodes = clusterNodes.filterNot(_ == node)
+    shardingCoordinator = shardingCoordinator match {
+      case Some(value) => Some(value)
+      case None        =>
+        Some(
+          shardingSingleton.create(
+            shardsCount,
+            (id: K) => ShardId(Math.abs(id.hashCode() % shardsCount)),
+            clusterNodes
+          )
+        )
+    }
 
-      override def callChangeOnNode(node: Node[WalletService], userId: UserId, amount: Int): ChangeResponse =
-        clusterNodes.filter(_ == node).head.service.change(userId, amount)
+    new Cluster[S, Req, Resp] {
+      override def addNode(node: Node[S, Req, Resp]): Unit = {
+        clusterNodes = clusterNodes + node
+        shardingCoordinator.map(_.updateMapping(clusterNodes))
+      }
 
-      override def callShowOnNode(node: Node[WalletService], userId: UserId): ShowResponse =
-        clusterNodes.filter(_ == node).head.service.show(userId)
+      override def removeNode(node: Node[S, Req, Resp]): Unit = {
+        clusterNodes = clusterNodes.filterNot(_ == node)
+        shardingCoordinator.map(_.updateMapping(clusterNodes))
+      }
 
-      override def callCalculateBalanceOnNode(node: Node[WalletService], userId: UserId): BalanceResponse =
-        clusterNodes.filter(_ == node).head.service.calculateBalance(userId)
+      override def runRequest(req: Req): Resp = {
+        val node = clusterNodes.drop(lastNodeUsed).head
+        lastNodeUsed = (lastNodeUsed + 1) % clusterNodes.size
+        println(s"Send request to node ${node.nodeId}")
+        node.requestHandler(req)
+      }
+
+      override def getNodeInfo(): Map[ShardId, Node[S, Req, Resp]] =
+        shardingCoordinator
+          .map(_.getMapping())
+          .map(Map.from)
+          .getOrElse(Map.empty)
     }
   }
 }

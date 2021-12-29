@@ -4,9 +4,9 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import wallet.dm.UserId
 import wallet.es.event.{ChangedEvent, Event}
-import wallet.es.fixtures.WalletFixtures
 import wallet.es.repository.journal.Journal
 import wallet.es.repository.state.{StateRepository, StateRepositoryImpl}
+import wallet.fixtures.WalletFixtures
 
 import java.util.concurrent.atomic.{AtomicInteger, AtomicReference}
 import scala.concurrent.ExecutionContext.global
@@ -30,7 +30,7 @@ class WalletServiceImplTest extends AnyFlatSpec with Matchers with WalletFixture
     val add10Resp: WalletService.ChangeResponse      = walletService.change(add10._1, add10._2)
     val withdraw5Resp: WalletService.ChangeResponse  = walletService.change(substr5._1, substr5._2)
     val showRes: WalletService.ShowResponse          = walletService.show(userId1)
-    val balanceResp: StateRepository.BalanceResponse = walletService.calculateBalance(userId1)
+    val balanceResp: WalletService.BalanceResponse = walletService.calculateBalance(userId1)
 
     val events = List(
       ChangedEvent(userId1, -5),
@@ -39,7 +39,7 @@ class WalletServiceImplTest extends AnyFlatSpec with Matchers with WalletFixture
 
     journal.getHistory(userId1) should contain theSameElementsInOrderAs events
     showRes.events should contain theSameElementsInOrderAs events
-    balanceResp.maybeBalance shouldBe Some(5)
+    balanceResp.balance shouldBe Some(5)
     add10Resp.msg should be(s"Balance changed from 0 to 10")
     withdraw5Resp.msg should be(s"Balance changed from 10 to 5")
   }
@@ -62,7 +62,7 @@ class WalletServiceImplTest extends AnyFlatSpec with Matchers with WalletFixture
     Await.ready(thread2, 5.seconds)
 
     journal.getHistory(userId1) should have length 40
-    walletService.calculateBalance(userId1).maybeBalance shouldBe Some(0)
+    walletService.calculateBalance(userId1).balance shouldBe Some(0)
   }
 
   it should "run commands in multi thread mode for 2 users" in {
@@ -97,7 +97,7 @@ class WalletServiceImplTest extends AnyFlatSpec with Matchers with WalletFixture
 
     journal.getHistory(userId1) should have length 40
     journal.getHistory(userId2) should have length 50
-    walletService.calculateBalance(userId1).maybeBalance shouldBe Some(0)
-    walletService.calculateBalance(userId2).maybeBalance shouldBe Some(250)
+    walletService.calculateBalance(userId1).balance shouldBe Some(0)
+    walletService.calculateBalance(userId2).balance shouldBe Some(250)
   }
 }

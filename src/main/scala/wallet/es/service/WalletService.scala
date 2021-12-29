@@ -2,20 +2,17 @@ package wallet
 package es
 package service
 
-import WalletService.{ChangeResponse, ShowResponse}
+import WalletService.{BalanceResponse, ChangeResponse, ShowResponse}
 import dm.UserId
 import event.{ChangedEvent, Event}
 import repository.journal.Journal
 import repository.journal.JournalResponse.{Failure, Success}
 import repository.state.StateRepository
-import repository.state.StateRepository.BalanceResponse
-import wallet.cluster.dm.Node
-import wallet.cluster.{Cluster, Sharding}
 
 trait WalletService {
   def change(userId: UserId, amount: Int): ChangeResponse
-  def show(userId: UserId): ShowResponse
   def calculateBalance(userId: UserId): BalanceResponse
+  def show(userId: UserId): ShowResponse
 }
 
 object WalletService {
@@ -27,37 +24,6 @@ object WalletService {
 
   def apply(repository: StateRepository, journal: Journal[UserId, Event]): WalletService =
     new WalletServiceImpl(repository, journal)
-
-  def walletServiceSharded(
-    cluster: Cluster[WalletService],
-    sharding: Sharding[UserId, WalletService],
-    walletService: WalletService
-  ): WalletService = {
-
-    val thisNode = Node[WalletService](walletService.hashCode().toString, walletService)
-
-    cluster.addNode(thisNode)
-
-    new WalletService {
-      override def change(userId: UserId, amount: Int): ChangeResponse =
-        sharding.nodeForShard(sharding.shardId(userId)) match {
-          case nodeForShard if nodeForShard == thisNode => walletService.change(userId, amount)
-          case otherNode                                => cluster.callChangeOnNode(otherNode, userId, amount)
-        }
-
-      override def show(userId: UserId): ShowResponse =
-        sharding.nodeForShard(sharding.shardId(userId)) match {
-          case nodeForShard if nodeForShard == thisNode => walletService.show(userId)
-          case otherNode                                => cluster.callShowOnNode(otherNode, userId)
-        }
-
-      override def calculateBalance(userId: UserId): StateRepository.BalanceResponse =
-        sharding.nodeForShard(sharding.shardId(userId)) match {
-          case nodeForShard if nodeForShard == thisNode => walletService.calculateBalance(userId)
-          case otherNode                                => cluster.callCalculateBalanceOnNode(otherNode, userId)
-        }
-    }
-  }
 }
 
 private class WalletServiceImpl(repository: StateRepository, journal: Journal[UserId, Event]) extends WalletService {
